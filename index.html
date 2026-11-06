@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur Vidéo IA - Agnes API</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #a5b4fc;
+            margin-bottom: 20px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        input[type="text"], input[type="password"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background-color: #0f172a;
+            color: var(--text);
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            background-color: var(--accent);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn:disabled {
+            background-color: #475569;
+            cursor: not-allowed;
+        }
+
+        #logArea {
+            background-color: #000;
+            color: #10b981;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 6px;
+            height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .video-card {
+            background: #0f172a;
+            border-radius: 8px;
+            overflow: hidden;
+            padding: 10px;
+            text-align: center;
+        }
+
+        video {
+            width: 100%;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎬 Studio Vidéo IA Illimité</h1>
+
+    <!-- Configuration API -->
+    <div class="section">
+        <label for="apiKey">Clé API Agnes AI :</label>
+        <input type="password" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" onchange="saveApiKey()">
+    </div>
+
+    <!-- Paramètres de Génération -->
+    <div class="section">
+        <label for="imageInput">1. Image de référence (Optionnelle) :</label>
+        <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+
+        <label for="prompt">2. Prompt / Description du mouvement :</label>
+        <textarea id="prompt" rows="3" placeholder="Ex: Un guerrier cyberpunk marchant sous la pluie néon..."></textarea>
+
+        <label for="styleSelect">3. Style Visuel :</label>
+        <select id="styleSelect">
+            <option value="cinematic">Cinématique 4K</option>
+            <option value="anime">Anime / Ghibli</option>
+            <option value="arcane">Style Arcane</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="manga">Manga Noir & Blanc</option>
+            <option value="3d-render">Rendu 3D Pixarian</option>
+        </select>
+
+        <label for="duration">4. Durée par clip (Secondes) :</label>
+        <select id="duration">
+            <option value="6.4" selected>6.4s (Recommandé - optimal pour le quota gratuit)</option>
+            <option value="5.0">5.0s</option>
+            <option value="10.0">10.0s</option>
+        </select>
+
+        <label for="clipCount">5. Nombre de clips à générer en boucle :</label>
+        <input type="number" id="clipCount" value="1" min="1" max="50">
+
+        <button class="btn" id="generateBtn" onclick="startGeneration()">🚀 Lancer la Génération</button>
+    </div>
+
+    <!-- Journal d'exécution -->
+    <div class="section">
+        <label>Journal de traitement :</label>
+        <div id="logArea">En attente d'initialisation...</div>
+    </div>
+
+    <!-- Galerie de résultats -->
+    <div class="section">
+        <label>Vidéos Générées :</label>
+        <div class="results-grid" id="resultsGrid"></div>
+    </div>
+</div>
+
+<script>
+    let base64Image = "";
+
+    // Charger la clé API au démarrage
+    window.onload = () => {
+        const savedKey = localStorage.getItem('agnes_api_key');
+        if (savedKey) {
+            document.getElementById('apiKey').value = savedKey;
+            log("Clé API chargée depuis le stockage local.");
+        }
+    };
+
+    function saveApiKey() {
+        const key = document.getElementById('apiKey').value.trim();
+        localStorage.setItem('agnes_api_key', key);
+        log("Clé API sauvegardée.");
+    }
+
+    function log(msg) {
+        const logArea = document.getElementById('logArea');
+        const timestamp = new Date().toLocaleTimeString();
+        logArea.innerText += `[${timestamp}] ${msg}\n`;
+        logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    function handleImageUpload(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                base64Image = evt.target.result;
+                log("Image chargée avec succès.");
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    async function startGeneration() {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        if (!apiKey) {
+            alert("Veuillez saisir votre clé API Agnes.");
+            return;
+        }
+
+        const prompt = document.getElementById('prompt').value.trim();
+        const style = document.getElementById('styleSelect').value;
+        const duration = parseFloat(document.getElementById('duration').value);
+        const totalClips = parseInt(document.getElementById('clipCount').value);
+        const btn = document.getElementById('generateBtn');
+
+        btn.disabled = true;
+        log(`Début du traitement de ${totalClips} clip(s)...`);
+
+        for (let i = 1; i <= totalClips; i++) {
+            log(`--- Génération du clip ${i}/${totalClips} ---`);
+            try {
+                const videoUrl = await requestVideoFromAgnes(apiKey, prompt, style, duration);
+                if (videoUrl) {
+                    addVideoToGallery(videoUrl, i);
+                    log(`Clip ${i} généré avec succès !`);
+                }
+            } catch (err) {
+                log(`Erreur sur le clip ${i}: ${err.message}`);
+            }
+
+            // Respect du quota gratuit (1 minute d'attente entre les requêtes si boucle)
+            if (i < totalClips) {
+                log("Attente de 65 secondes pour respecter la limite du quota gratuit...");
+                await new Promise(res => setTimeout(res, 65000));
+            }
+        }
+
+        btn.disabled = false;
+        log("Traitement terminé.");
+    }
+
+    async function requestVideoFromAgnes(apiKey, promptText, style, duration) {
+        const endpoint = "https://api.agnes-ai.com/v1/videos/generations";
+
+        const payload = {
+            model: "agnes-video-v2.0",
+            prompt: `${promptText}, style: ${style}`,
+            duration: duration,
+            ...(base64Image ? { image: base64Image } : {})
+        };
+
+        log("Envoi de la requête à l'API Agnes...");
+        
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.message || `Erreur HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.video_url || (data.data && data.data[0]?.url);
+    }
+
+    function addVideoToGallery(url, index) {
+        const grid = document.getElementById('resultsGrid');
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.innerHTML = `
+            <video controls autoplay loop src="${url}"></video>
+            <p>Clip #${index}</p>
+            <a href="${url}" target="_blank" download="video_${index}.mp4" style="color: #6366f1;">Télécharger</a>
+        `;
+        grid.prepend(card);
+    }
+</script>
+
+</body>
+</html>
