@@ -250,7 +250,7 @@
     }
 
     async function requestVideoFromAgnes(apiKey, promptText, style, duration) {
-        const endpoint = "https://api.agnes-ai.com/v1/videos/generations";
+        const endpoint = "https://corsproxy.io/?" + encodeURIComponent("https://api.agnes-ai.com/v1/videos/generations");
 
         const payload = {
             model: "agnes-video-v2.0",
